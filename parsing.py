@@ -1,12 +1,5 @@
-import glob
 import pandas as pd
 from unidecode import unidecode
-
-# Funzione per caricare tutti i CSV in un unico DataFrame
-def load_all_csvs():
-    csv_files = glob.glob('meanSkill*.csv')
-    data_frames = [pd.read_csv(file) for file in csv_files]
-    return pd.concat(data_frames, ignore_index=True)
 
 # Funzione per normalizzare i nomi
 def normalize_name(name):
@@ -24,42 +17,25 @@ def get_matching_key(name):
     return tokens[0]  # Usa solo la prima parola
 
 # Carica i dati da tutti i file CSV
-df = load_all_csvs()
+fantapedia_df = pd.read_csv('./data/output/meanSkill.csv', encoding='latin-1')
+#fantapedia_df = fantapedia_df[fantapedia_df["Nome"].str.contains("SERGI")]
 
 # Carica i dati dal file Excel
-df2 = pd.read_excel('/Quotazioni_Fantacalcio_Stagione_2024_25.xlsx', skiprows=1)
-
-# Normalizza i nomi dei giocatori
-df['Nome'] = df['Nome'].apply(normalize_name)
-df2['Nome'] = df2['Nome'].apply(normalize_name)
+fantacalcio_df = pd.read_excel('./data/input/Quotazioni_Fantacalcio_Stagione_2024_25.xlsx', skiprows=1)
+#fantacalcio_df = fantacalcio_df[fantacalcio_df["Nome"].str.contains("Sergi")]
 
 # Crea una colonna per la chiave di matching
-df['MatchingKey'] = df['Nome'].apply(get_matching_key)
-df2['MatchingKey'] = df2['Nome'].apply(get_matching_key)
+fantapedia_df['MatchingKey'] = fantapedia_df['Nome'].apply(normalize_name)
+fantacalcio_df['MatchingKey'] = fantacalcio_df['Nome'].apply(normalize_name)
 
 # Unisci i DataFrame df e df2 usando la chiave di matching
-df = df.merge(df2, on='MatchingKey', how='left', suffixes=('_csv', '_excel'))
+merged_df = fantacalcio_df.merge(fantapedia_df, on='MatchingKey', how='left', suffixes=('_excel', '_csv'))
 
 # Verifica le righe nel DataFrame finale
-print("Righe nel DataFrame finale:", len(df))
+print("Righe nel DataFrame finale:", len(merged_df))
 print("Prime righe del DataFrame finale:")
-print(df.head())
+print(merged_df.head())
 
-# Rimuovi duplicati
-df.drop_duplicates(inplace=True)
+merged_df.loc[merged_df['R'].notna() & (merged_df['R'] != ''), 'Ruolo'] = merged_df['R']
 
-df.loc[df['R'].notna() & (df['R'] != ''), 'Ruolo'] = df['R']
-
-def keep_row(group):
-    # Verifica se c'è una riga dove Nome_csv è uguale a Nome_excel
-    matching_rows = group[group['Nome_csv'] == group['Nome_excel']]
-    if not matching_rows.empty:
-        return matching_rows.iloc[0]  # Restituisci la prima corrispondenza trovata
-    else:
-        return group.iloc[0]  # Altrimenti, restituisci la prima riga del gruppo
-
-# Applica la funzione su ogni gruppo di duplicati in Nome_csv
-df= df.groupby('Nome_csv').apply(keep_row).reset_index(drop=True)
-df.drop_duplicates(inplace=True)
-# Salva il DataFrame unito in un nuovo file CSV
-df.to_csv('/Users/umbertobertonelli/PycharmProjects/pythonProject4/dati_uniti.csv', index=False)
+merged_df.to_csv('./data/output/dati_uniti.csv', index=False)
